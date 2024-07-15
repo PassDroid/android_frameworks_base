@@ -14424,6 +14424,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             }
         } else if (dispatchGenericFocusedEvent(event)) {
             return true;
+        } else if ((source & InputDevice.SOURCE_TOUCHPAD) != 0 && event.getDeviceId() == getTouchKeypadDeviceId()) {
+            if (dispatchGenericTouchKeypadEvent(event))
+                return true;
         }
 
         if (dispatchGenericMotionEventInternal(event)) {
@@ -14434,6 +14437,39 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             mInputEventConsistencyVerifier.onUnhandledEvent(event, 0);
         }
         return false;
+    }
+
+    /**
+     * Dispatch a generic touch keypad event.
+     * <p>
+     * Do not call this method directly.
+     * Call {@link #dispatchGenericMotionEvent(MotionEvent)} instead.
+     * </p>
+     *
+     * @param event The motion event to be dispatched.
+     * @return True if the event was handled by the view, false otherwise.
+     */
+    public boolean dispatchGenericTouchKeypadEvent(@NonNull MotionEvent event) {
+        return false;
+    }
+
+    private static int sTouchKeypadDeviceId = -1;
+
+    public static int getTouchKeypadDeviceId() {
+        if (sTouchKeypadDeviceId == -1) {
+            int numDevices = InputDevice.getDeviceIds().length;
+            int touchKeypadDeviceId = -2;
+
+            for (int id = 0; id < numDevices; id++) {
+                InputDevice device = InputDevice.getDevice(id);
+                if (device == null || (device.getSources() & InputDevice.SOURCE_TOUCHPAD) == 0 || device.isExternal())
+                     continue;
+
+                touchKeypadDeviceId = id;
+            }
+            sTouchKeypadDeviceId = touchKeypadDeviceId;
+        }
+        return sTouchKeypadDeviceId;
     }
 
     private boolean dispatchGenericMotionEventInternal(MotionEvent event) {

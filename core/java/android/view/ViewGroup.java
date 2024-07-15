@@ -50,6 +50,7 @@ import android.os.Bundle;
 import android.os.Parcelable;
 import android.os.SystemClock;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.Pools;
 import android.util.Pools.SynchronizedPool;
@@ -2570,6 +2571,66 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
 
         // No child handled the event.  Send it to this view group.
         return super.dispatchGenericPointerEvent(event);
+    }
+
+    @Override
+    public boolean dispatchGenericTouchKeypadEvent(@NonNull MotionEvent event) {
+        InputDevice device = event.getDevice();
+        Display display = getDisplay();
+        DisplayMetrics dm = this.mContext.getResources().getDisplayMetrics();
+        boolean skipFocused = false;
+
+        if (device != null && display != null && dm != null && mChildrenCount != 0) {
+            float x = dm.widthPixels * 0.5f;
+            float y = dm.heightPixels * 0.5f;
+
+            switch (display.getRotation()) {
+                case Surface.ROTATION_0:
+                case Surface.ROTATION_180:
+                    InputDevice.MotionRange xRange = device.getMotionRange(0);
+                    if (xRange != null) {
+                        Point realDisplaySize = new Point();
+                        display.getRealSize(realDisplaySize);
+                        x = (realDisplaySize.x * ((event.getX() - xRange.getMin()) / xRange.getRange())) - mAttachInfo.mWindowLeft;
+                        if (x < 0.0f) {
+                            x = 0.0f;
+                        } else if (x >= dm.widthPixels) {
+                            x = dm.widthPixels - 1;
+                        }
+                    }
+                    break;
+
+                case Surface.ROTATION_90:
+                default:
+                    break;
+            }
+
+            for (int i = mChildrenCount - 1; i >= 0; i--) {
+                int childIndex = isChildrenDrawingOrderEnabled() ? getChildDrawingOrder(mChildrenCount, i) : i;
+                View child = mChildren[childIndex];
+                if (child.canReceivePointerEvents() && isTransformedTouchPointInView(x, y, child, null)) {
+                    if (child.dispatchGenericMotionEvent(event)) {
+                        return true;
+                    }
+                    if (child == mFocused) {
+                        skipFocused = true;
+                    }
+                }
+            }
+        }
+
+        if (
+            !isInTouchMode() &&
+            !skipFocused &&
+            mFocused != null &&
+            mFocused.canReceivePointerEvents() &&
+            (mFocused.mPrivateFlags & PFLAG_HAS_BOUNDS) != 0 &&
+            mFocused.dispatchGenericMotionEvent(event)
+        ) {
+            return true;
+        }
+
+        return super.dispatchGenericTouchKeypadEvent(event);
     }
 
     @Override
